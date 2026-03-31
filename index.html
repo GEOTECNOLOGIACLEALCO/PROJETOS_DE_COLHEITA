@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+    <style>
+        #painel-controle {
+            position: fixed; top: 20px; left: 50px; width: 250px; 
+            z-index: 9999; background: white; padding: 20px; 
+            border: 3px solid #222; border-radius: 12px;
+            font-family: 'Arial', sans-serif; box-shadow: 5px 5px 15px rgba(0,0,0,0.4);
+        }
+        .item-menu { margin-bottom: 15px; }
+        .btn-reset { width: 100%; padding: 8px; cursor: pointer; background: #f0f0f0; border: 1px solid #999; border-radius: 5px; }
+        .rotulo-agro { pointer-events: none; }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_3ef572f2da7b11e5f78cee5c60a673f9 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+    <div id="painel-controle">
+        <h3 style="margin-top:0;">🚜 AGRO MAPA</h3>
+        
+        <div class="item-menu">
+            <b>🔍 Buscar Fazenda:</b><br>
+            <input list="lista_fazendas" id="input_fazenda" oninput="executarFiltro()" placeholder="Escreva o nome..." style="width: 100%; padding: 8px; border: 1px solid #ccc;">
+            <datalist id="lista_fazendas"><option value="300044"><option value="300492"><option value="301482"><option value="302979 - 302980"><option value="302981"><option value="306513"><option value="307214"><option value="307345"><option value="308054"></datalist>
+        </div>
+
+        <div class="item-menu">
+            <b>🎨 Escolher Tema:</b><br>
+            <input type="radio" name="tema" onclick="trocarTema(1)" checked> Tema 01 (Classes)<br>
+            <input type="radio" name="tema" onclick="trocarTema(2)"> Tema 02 (Talhões)
+        </div>
+
+        <button class="btn-reset" onclick="location.reload()">🔄 Resetar Mapa</button>
+    </div>
+    
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+    var mapObj = null;
+    var tilesCarregados = new Set();
+    var filtroFazenda = "";
+    var temaAtivo = 1; 
+    var camadasGeo = [];
+    var markersList = [];
+
+    $(document).ready(function() {
+        setTimeout(function() {
+            mapObj = window[document.querySelector('.folium-map').id];
+            $.getJSON("manifesto.json", function(data) {
+                mapObj.on('moveend', function() { scanTiles(data); });
+                scanTiles(data);
+            });
+        }, 600);
+    });
+
+    function trocarTema(t) {
+        temaAtivo = t;
+        refreshVisual();
+        document.getElementById('legenda_tiro').style.display = (temaAtivo == 1) ? 'block' : 'none';
+    }
+
+    function executarFiltro() {
+        filtroFazenda = document.getElementById('input_fazenda').value;
+        refreshVisual();
+    }
+
+    function refreshVisual() {
+        camadasGeo.forEach(function(c) {
+            c.eachLayer(function(l) {
+                var p = l.feature.properties;
+                if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
+                    l.setStyle({ opacity: 0, weight: 0, fillOpacity: 0 });
+                } else {
+                    var cor = (temaAtivo == 1) ? getCorClasse(p.CLASSE) : p.color_talhao;
+                    l.setStyle({ color: cor, weight: 1, opacity: 0.8, fillOpacity: 0.4 });
+                }
+            });
+        });
+
+        markersList.forEach(function(m) {
+            var visivel = (temaAtivo == 2) && (filtroFazenda === "" || m.options.alt === filtroFazenda);
+            if (visivel) { m.addTo(mapObj); } else { mapObj.removeLayer(m); }
+        });
+    }
+
+    function getCorClasse(v) {
+        return v <= 150 ? '#8c0000' : v <= 300 ? '#ff0000' : v <= 450 ? '#ffff00' : v <= 700 ? '#00ff00' : '#00fffa';
+    }
+
+    function scanTiles(manifesto) {
+        var vBounds = mapObj.getBounds();
+        manifesto.forEach(function(tile) {
+            if (vBounds.intersects(L.latLngBounds(tile.bounds)) && !tilesCarregados.has(tile.arquivo)) {
+                tilesCarregados.add(tile.arquivo);
+                $.getJSON("tiles/" + tile.arquivo, function(geo) {
+                    var layer = L.geoJson(geo, {
+                        onEachFeature: function(f, l) {
+                            l.bindTooltip("Talhão: " + f.properties.TALHAO);
+                            var marker = L.marker(l.getBounds().getCenter(), {
+                                icon: L.divIcon({ className: 'rotulo-agro', html: '<b style="color:white; text-shadow: 1px 1px 2px black;">'+f.properties.TALHAO+'</b>' }),
+                                alt: f.properties.FAZENDA
+                            });
+                            markersList.push(marker);
+                        }
+                    }).addTo(mapObj);
+                    camadasGeo.push(layer);
+                    refreshVisual();
+                });
+            }
+        });
+    }
+    </script>
+    
+    <div id="legenda_tiro" style="position: fixed; bottom: 30px; left: 30px; width: 130px; z-index:9999; background: white; padding: 10px; border: 2px solid black; font-size: 11px;"><b>Legenda Tiro</b><br><i style="background:#8c0000;width:8px;height:8px;display:inline-block"></i> 0-150<br><i style="background:#ff0000;width:8px;height:8px;display:inline-block"></i> 150-300<br><i style="background:#ffff00;width:8px;height:8px;display:inline-block"></i> 300-450<br><i style="background:#00ff00;width:8px;height:8px;display:inline-block"></i> 450-700<br><i style="background:#00fffa;width:8px;height:8px;display:inline-block"></i> > 700</div>
+    
+            <div class="folium-map" id="map_3ef572f2da7b11e5f78cee5c60a673f9" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_3ef572f2da7b11e5f78cee5c60a673f9 = L.map(
+                "map_3ef572f2da7b11e5f78cee5c60a673f9",
+                {
+                    center: [-21.410078193974265, -50.45273479974835],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 15,
+  "zoomControl": true,
+  "preferCanvas": true,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_4d02dce3e21a9ada5b2b811483021fba = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 22,
+  "maxNativeZoom": 22,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_4d02dce3e21a9ada5b2b811483021fba.addTo(map_3ef572f2da7b11e5f78cee5c60a673f9);
+        
+    
+            var tile_layer_7946de2a0b3b83c44f6c0555caceb50a = L.tileLayer(
+                "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
+                {
+  "minZoom": 0,
+  "maxZoom": 22,
+  "maxNativeZoom": 22,
+  "noWrap": false,
+  "attribution": "Google",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_7946de2a0b3b83c44f6c0555caceb50a.addTo(map_3ef572f2da7b11e5f78cee5c60a673f9);
+        
+</script>
+</html>
