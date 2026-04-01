@@ -7,18 +7,18 @@
     <style>
         #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); }
         
-        .rotulo-unico { 
+        .rotulo-hd { 
             color: black !important; 
             font-weight: 900 !important; 
-            font-size: 14px !important; 
+            font-size: 18px !important; 
             text-shadow: 
-                -2px -2px 0 #fff,  
-                 2px -2px 0 #fff,
-                -2px  2px 0 #fff,
-                 2px  2px 0 #fff,
-                 0px  0px 5px #fff; /* Buffer/Borda branca ao redor da letra preta */
+                -3px -3px 0 #fff,  
+                 3px -3px 0 #fff,
+                -3px  3px 0 #fff,
+                 3px  3px 0 #fff,
+                 0px  0px 10px #fff; 
             white-space: nowrap; 
-            pointer-events: none; 
+            pointer-events: none;
             background: none !important;
             border: none !important;
         }
@@ -42,7 +42,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_47c76d448319e4098b9a148e9baa49eb {
+                #map_cd73ab833bb990879441ff341b22e91b {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -81,7 +81,7 @@
     
     <div id="painel">
         <b style="font-size: 15px;">🚜 GESTÃO CLEALCO</b><br><br>
-        <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" placeholder="🔍 Selecione a Fazenda..." style="width: 90%; padding: 8px;">
+        <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" placeholder="🔍 Buscar Fazenda..." style="width: 90%; padding: 8px; border-radius: 5px;">
         <datalist id="lista_fazendas"><option value="100453"><option value="107383"><option value="200501"><option value="202944"><option value="202948"></datalist>
         <hr>
         <div style="font-size: 12px;">
@@ -96,7 +96,7 @@
             <input type="checkbox" id="chk_satelite" checked onclick="toggleSatelite()"> Imagem Satélite
         </div>
         <br>
-        <button onclick="location.reload()" style="width: 100%; padding: 5px; cursor: pointer;">🔄 Resetar Mapa</button>
+        <button onclick="location.reload()" style="width: 100%; padding: 5px; cursor: pointer; border-radius: 5px;">🔄 Resetar Mapa</button>
     </div>
     <div id="legenda-tiro">
         <b>Legenda Tiros</b><br><br>
@@ -117,20 +117,23 @@
         setTimeout(function() {
             mapObj = window[document.querySelector('.folium-map').id];
             
-            // Criar um "Pane" (Painel) especial para as divisas ficarem sempre no topo
+            // 1. CRIAR PANES (GAVETAS) PARA HIERARQUIA DE VISUALIZAÇÃO
             mapObj.createPane('pane_divisas');
-            mapObj.getPane('pane_divisas').style.zIndex = 650; // Acima das linhas, abaixo do UI
-            mapObj.getPane('pane_divisas').style.pointerEvents = 'none'; // Permite clicar nas linhas se precisar
+            mapObj.getPane('pane_divisas').style.zIndex = 650; // Acima das linhas
+            mapObj.getPane('pane_divisas').style.pointerEvents = 'auto'; // PERMITE CLICAR/POPUP
+
+            mapObj.createPane('pane_labels');
+            mapObj.getPane('pane_labels').style.zIndex = 700; // NO TOPO DE TUDO
+            mapObj.getPane('pane_labels').style.pointerEvents = 'none';
 
             mapObj.eachLayer(function(l) {
                 if (l._url && l._url.includes('google')) camadaSatelite = l;
-                if (l._url && l._url.includes('openstreetmap')) camadaMapaBase = l;
             });
 
-            // 1. CARREGAR DIVISAS (NO PANE SUPERIOR)
+            // 2. CARREGAR DIVISAS (NO PANE 650)
             $.getJSON("divisas.json", function(data) {
                 camadaDivisas = L.geoJson(data, {
-                    pane: 'pane_divisas', // <-- O segredo para ficar por cima!
+                    pane: 'pane_divisas',
                     style: { color: "black", weight: 3, fillOpacity: 0, interactive: true },
                     onEachFeature: function(f, l) {
                         var p = f.properties;
@@ -139,20 +142,20 @@
                 }).addTo(mapObj);
             });
 
-            // 2. LABELS
+            // 3. CARREGAR LABELS (NO PANE 700)
             $.getJSON("labels.json", function(data) {
                 data.forEach(function(l) {
                     var m = L.marker([l.lat, l.lng], { 
-                        icon: L.divIcon({ className: 'rotulo-unico', html: l.talhao }), 
+                        icon: L.divIcon({ className: 'rotulo-hd', html: l.talhao }), 
                         alt: l.fazenda,
-                        zIndexOffset: 1000 // Rótulos sempre acima de tudo
+                        pane: 'pane_labels'
                     });
                     marcadoresLabels.push(m);
                 });
                 refreshVisual();
             });
 
-            // 3. TILES
+            // 4. TILES DINÂMICOS
             $.getJSON("manifesto.json", function(data) {
                 mapObj.on('moveend', function() { scanTiles(data); });
                 scanTiles(data);
@@ -166,8 +169,8 @@
     }
 
     function toggleSatelite() {
-        if (document.getElementById('chk_satelite').checked) { mapObj.addLayer(camadaSatelite); mapObj.removeLayer(camadaMapaBase); }
-        else { mapObj.addLayer(camadaMapaBase); mapObj.removeLayer(camadaSatelite); }
+        if (document.getElementById('chk_satelite').checked) { mapObj.addLayer(camadaSatelite); }
+        else { mapObj.removeLayer(camadaSatelite); }
     }
 
     function mudarTema(t) { 
@@ -221,16 +224,16 @@
     </script>
     
     
-            <div class="folium-map" id="map_47c76d448319e4098b9a148e9baa49eb" ></div>
+            <div class="folium-map" id="map_cd73ab833bb990879441ff341b22e91b" ></div>
         
 </body>
 <script>
     
     
-            var map_47c76d448319e4098b9a148e9baa49eb = L.map(
-                "map_47c76d448319e4098b9a148e9baa49eb",
+            var map_cd73ab833bb990879441ff341b22e91b = L.map(
+                "map_cd73ab833bb990879441ff341b22e91b",
                 {
-                    center: [-21.83698445739571, -50.30343933606044],
+                    center: [-21.83703429550133, -50.30343193537291],
                     crs: L.CRS.EPSG3857,
                     ...{
   "zoom": 15,
@@ -245,7 +248,7 @@
 
         
     
-            var tile_layer_f51ead1485d9712e70844196c938351e = L.tileLayer(
+            var tile_layer_f9392f6c56eae18e025324a762c5132d = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 14,
@@ -262,10 +265,10 @@
             );
         
     
-            tile_layer_f51ead1485d9712e70844196c938351e.addTo(map_47c76d448319e4098b9a148e9baa49eb);
+            tile_layer_f9392f6c56eae18e025324a762c5132d.addTo(map_cd73ab833bb990879441ff341b22e91b);
         
     
-            var tile_layer_c70f211412fce1a046f13dd3c4854bb0 = L.tileLayer(
+            var tile_layer_76b1bba7ad96c8efb31a888bb59aaffc = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -282,27 +285,7 @@
             );
         
     
-            tile_layer_c70f211412fce1a046f13dd3c4854bb0.addTo(map_47c76d448319e4098b9a148e9baa49eb);
-        
-    
-            var tile_layer_5094a529d25799efd51d6cd87a2f1b0d = L.tileLayer(
-                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                {
-  "minZoom": 0,
-  "maxZoom": 19,
-  "maxNativeZoom": 19,
-  "noWrap": false,
-  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
-  "subdomains": "abc",
-  "detectRetina": false,
-  "tms": false,
-  "opacity": 1,
-}
-
-            );
-        
-    
-            tile_layer_5094a529d25799efd51d6cd87a2f1b0d.addTo(map_47c76d448319e4098b9a148e9baa49eb);
+            tile_layer_76b1bba7ad96c8efb31a888bb59aaffc.addTo(map_cd73ab833bb990879441ff341b22e91b);
         
 </script>
 </html>
