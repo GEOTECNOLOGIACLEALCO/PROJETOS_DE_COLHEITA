@@ -8,7 +8,7 @@
         #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); }
         .rotulo-unico { color: white; font-weight: bold; background: rgba(0,0,0,0.6); padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid white; white-space: nowrap; pointer-events: none; }
         #rodape-clealco { position: fixed; bottom: 10px; right: 10px; z-index: 9999; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 5px; font-family: sans-serif; font-size: 12px; font-weight: bold; color: #333; border: 1px solid #999; }
-        #legenda-tiro { position: fixed; bottom: 30px; left: 30px; z-index: 9999; background: white; padding: 10px; border-radius: 8px; border: 2px solid #222; font-family: sans-serif; font-size: 12px; display: block; box-shadow: 2px 2px 10px rgba(0,0,0,0.2); }
+        #legenda-tiro { position: fixed; bottom: 30px; left: 30px; z-index: 9999; background: white; padding: 10px; border-radius: 8px; border: 2px solid #222; font-family: sans-serif; font-size: 12px; display: block; }
         #legenda-tiro i { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border-radius: 2px; vertical-align: middle; }
     </style>
     
@@ -26,7 +26,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_104dee7924c54d4234391eb1c60efdf3 {
+                #map_4776bbc593cd6cdde94a952aa59fa279 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -84,12 +84,7 @@
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-    var mapObj = null;
-    var tilesCarregados = new Set();
-    var filtroFazenda = "";
-    var temaAtivo = 1;
-    var camadasGeo = [];
-    var marcadoresLabels = [];
+    var mapObj = null, tilesCarregados = new Set(), filtroFazenda = "", temaAtivo = 1, camadasGeo = [], marcadoresLabels = [];
 
     $(document).ready(function() {
         setTimeout(function() {
@@ -107,6 +102,7 @@
             });
 
             $.getJSON("manifesto.json", function(data) {
+                // Só verifica tiles quando o mapa para de se mexer (ganha muita velocidade)
                 mapObj.on('moveend', function() { scanTiles(data); });
                 scanTiles(data);
             });
@@ -122,16 +118,9 @@
     function atualizarMapa() { 
         filtroFazenda = document.getElementById('input_fazenda').value;
         refreshVisual();
-        
         if (filtroFazenda !== "") {
-            var farmBounds = [];
-            marcadoresLabels.forEach(function(m) {
-                if (m.options.alt === filtroFazenda) {
-                    farmBounds.push(m.getLatLng());
-                }
-            });
-            
-            if (farmBounds.length > 0) {
+            var farmPoints = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
+            if (farmPoints.length > 0) {
                 var group = new L.featureGroup(marcadoresLabels.filter(m => m.options.alt === filtroFazenda));
                 mapObj.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 18 });
             }
@@ -139,21 +128,17 @@
     }
 
     function refreshVisual() {
-        camadasGeo.forEach(function(c) {
-            c.eachLayer(function(l) {
-                var p = l.feature.properties;
-                if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
-                    l.setStyle({ opacity: 0, weight: 0 });
-                } else {
-                    var cor = (temaAtivo == 1) ? getCor(p.CLASSE) : p.color_talhao;
-                    l.setStyle({ color: cor, weight: 1, opacity: 0.8 });
-                }
-            });
-        });
-
-        marcadoresLabels.forEach(function(m) {
-            var visivel = (temaAtivo == 2) && (filtroFazenda === "" || m.options.alt === filtroFazenda);
-            if (visivel) { m.addTo(mapObj); } else { mapObj.removeLayer(m); }
+        camadasGeo.forEach(c => c.eachLayer(l => {
+            var p = l.feature.properties;
+            if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
+                l.setStyle({ opacity: 0, weight: 0 });
+            } else {
+                l.setStyle({ color: (temaAtivo == 1 ? getCor(p.CLASSE) : p.color_talhao), weight: 1, opacity: 0.8 });
+            }
+        }));
+        marcadoresLabels.forEach(m => {
+            if (temaAtivo == 2 && (filtroFazenda === "" || m.options.alt === filtroFazenda)) { m.addTo(mapObj); }
+            else { mapObj.removeLayer(m); }
         });
     }
 
@@ -165,6 +150,9 @@
     }
 
     function scanTiles(manifesto) {
+        // Só carrega tiles se o zoom for maior que 14 (evita carregar tudo no zoom out)
+        if (mapObj.getZoom() < 14) return;
+
         var vBounds = mapObj.getBounds();
         manifesto.forEach(function(tile) {
             if (vBounds.intersects(L.latLngBounds(tile.bounds)) && !tilesCarregados.has(tile.arquivo)) {
@@ -180,19 +168,29 @@
     </script>
     
     
-            <div class="folium-map" id="map_104dee7924c54d4234391eb1c60efdf3" ></div>
+            <div class="folium-map" id="map_4776bbc593cd6cdde94a952aa59fa279" ></div>
         
 </body>
 <script>
     
     
-            var map_104dee7924c54d4234391eb1c60efdf3 = L.map(
-                "map_104dee7924c54d4234391eb1c60efdf3",
+            var map_4776bbc593cd6cdde94a952aa59fa279 = L.map(
+                "map_4776bbc593cd6cdde94a952aa59fa279",
                 {
-                    center: [-21.83698501553575, -50.30343926982219],
+                    center: [-21.83703429550133, -50.30343193537291],
                     crs: L.CRS.EPSG3857,
                     ...{
-  "zoom": 10,
+  "maxBounds": [
+[
+-22.059572298806888,
+-50.55330270000086,
+],
+[
+-21.460069498784254,
+-50.096093600000025,
+],
+],
+  "zoom": 15,
   "zoomControl": true,
   "preferCanvas": true,
 }
@@ -204,10 +202,10 @@
 
         
     
-            var tile_layer_03447421f4cc3fb3e60dc11486c424b8 = L.tileLayer(
+            var tile_layer_4cc1f5afdf61f84636e1e6439e0bb7a5 = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
-  "minZoom": 0,
+  "minZoom": 14,
   "maxZoom": 22,
   "maxNativeZoom": 22,
   "noWrap": false,
@@ -221,10 +219,10 @@
             );
         
     
-            tile_layer_03447421f4cc3fb3e60dc11486c424b8.addTo(map_104dee7924c54d4234391eb1c60efdf3);
+            tile_layer_4cc1f5afdf61f84636e1e6439e0bb7a5.addTo(map_4776bbc593cd6cdde94a952aa59fa279);
         
     
-            var tile_layer_264dc37247b9c5beef0f06152e62a381 = L.tileLayer(
+            var tile_layer_6495898c0c24d721cf5239c26fb3bc2a = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -241,7 +239,7 @@
             );
         
     
-            tile_layer_264dc37247b9c5beef0f06152e62a381.addTo(map_104dee7924c54d4234391eb1c60efdf3);
+            tile_layer_6495898c0c24d721cf5239c26fb3bc2a.addTo(map_4776bbc593cd6cdde94a952aa59fa279);
         
 </script>
 </html>
