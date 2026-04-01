@@ -26,7 +26,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_552931cc45bb086006610a4ee7e70da8 {
+                #map_dcd2848d18ba90e4f05f564b9c97051c {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -66,17 +66,16 @@
     <div id="painel">
         <b style="font-size: 16px;">🚜 PROJETOS DE COLHEITA</b><br><br>
         <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" placeholder="🔍 Selecione a Fazenda..." style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-        <datalist id="lista_fazendas"><option value="100453"><option value="107383"><option value="200501"><option value="202944"><option value="202948"></datalist>
-        <br><br>
+        <datalist id="lista_fazendas"><option value="100453"><option value="107383"><option value="200501"><option value="202944"><option value="202948"></datalist><br><br>
         <input type="radio" name="tema" onclick="mudarTema(1)" checked> Classificação de tiro<br>
-        <input type="radio" name="tema" onclick="mudarTema(2)"> Classificação de exportação<br><br>
-        <button onclick="location.reload()" style="width: 100%; padding: 8px; cursor: pointer; background: #eee; border: 1px solid #aaa; border-radius: 5px;">Resetar Visão</button>
+        <input type="radio" name="tema" onclick="mudarTema(2)"> Classificação de talhão<br><br>
+        <button onclick="location.reload()" style="width: 100%; padding: 5px; cursor: pointer;">Resetar Visão</button>
     </div>
     <div id="legenda-tiro">
         <b style="font-size: 13px;">Legenda de Tiros</b><br><br>
-        <i style="background:#ff0000"></i> 0 - 150<br>
-        <i style="background:#ffff00"></i> 151 - 300<br>
-        <i style="background:#00ff00"></i> 301 - 450<br>
+        <i style="background:#ff0000"></i> 0 - 150<br><br>
+        <i style="background:#ffff00"></i> 151 - 300<br><br>
+        <i style="background:#00ff00"></i> 301 - 450<br><br>
         <i style="background:#00fffa"></i> > 450
     </div>
     <div id="rodape-clealco">Desenvolvido por Geotecnologia Clealco</div>
@@ -84,25 +83,30 @@
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-    var mapObj = null, tilesCarregados = new Set(), filtroFazenda = "", temaAtivo = 1, camadasGeo = [], marcadoresLabels = [];
+    var mapObj = null, tilesCarregados = new Set(), filtroFazenda = "", temaAtivo = 1, camadasLinhas = [], marcadoresLabels = [];
 
     $(document).ready(function() {
         setTimeout(function() {
             mapObj = window[document.querySelector('.folium-map').id];
-            
+
+            // 1. CARREGAR DIVISAS FIXAS (Não entra no filtro, não sai do mapa)
+            $.getJSON("divisas.json", function(data) {
+                L.geoJson(data, {
+                    style: { color: "black", weight: 3, fillOpacity: 0, interactive: false }
+                }).addTo(mapObj);
+            });
+
+            // 2. CARREGAR LABELS
             $.getJSON("labels.json", function(data) {
                 data.forEach(function(l) {
-                    var marker = L.marker([l.lat, l.lng], {
-                        icon: L.divIcon({ className: 'rotulo-unico', html: l.talhao }),
-                        alt: l.fazenda
-                    });
+                    var marker = L.marker([l.lat, l.lng], { icon: L.divIcon({ className: 'rotulo-unico', html: l.talhao }), alt: l.fazenda });
                     marcadoresLabels.push(marker);
                 });
                 refreshVisual();
             });
 
+            // 3. CARREGAR TILES DINÂMICOS
             $.getJSON("manifesto.json", function(data) {
-                // Só verifica tiles quando o mapa para de se mexer (ganha muita velocidade)
                 mapObj.on('moveend', function() { scanTiles(data); });
                 scanTiles(data);
             });
@@ -119,16 +123,13 @@
         filtroFazenda = document.getElementById('input_fazenda').value;
         refreshVisual();
         if (filtroFazenda !== "") {
-            var farmPoints = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
-            if (farmPoints.length > 0) {
-                var group = new L.featureGroup(marcadoresLabels.filter(m => m.options.alt === filtroFazenda));
-                mapObj.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 18 });
-            }
+            var pts = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
+            if (pts.length > 0) { mapObj.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 18 }); }
         }
     }
 
     function refreshVisual() {
-        camadasGeo.forEach(c => c.eachLayer(l => {
+        camadasLinhas.forEach(c => c.eachLayer(l => {
             var p = l.feature.properties;
             if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
                 l.setStyle({ opacity: 0, weight: 0 });
@@ -150,16 +151,14 @@
     }
 
     function scanTiles(manifesto) {
-        // Só carrega tiles se o zoom for maior que 14 (evita carregar tudo no zoom out)
         if (mapObj.getZoom() < 14) return;
-
         var vBounds = mapObj.getBounds();
         manifesto.forEach(function(tile) {
             if (vBounds.intersects(L.latLngBounds(tile.bounds)) && !tilesCarregados.has(tile.arquivo)) {
                 tilesCarregados.add(tile.arquivo);
                 $.getJSON("tiles/" + tile.arquivo, function(geo) {
                     var layer = L.geoJson(geo).addTo(mapObj);
-                    camadasGeo.push(layer);
+                    camadasLinhas.push(layer);
                     refreshVisual();
                 });
             }
@@ -168,28 +167,18 @@
     </script>
     
     
-            <div class="folium-map" id="map_552931cc45bb086006610a4ee7e70da8" ></div>
+            <div class="folium-map" id="map_dcd2848d18ba90e4f05f564b9c97051c" ></div>
         
 </body>
 <script>
     
     
-            var map_552931cc45bb086006610a4ee7e70da8 = L.map(
-                "map_552931cc45bb086006610a4ee7e70da8",
+            var map_dcd2848d18ba90e4f05f564b9c97051c = L.map(
+                "map_dcd2848d18ba90e4f05f564b9c97051c",
                 {
                     center: [-21.83703429550133, -50.30343193537291],
                     crs: L.CRS.EPSG3857,
                     ...{
-  "maxBounds": [
-[
--22.059572298806888,
--50.55330270000086,
-],
-[
--21.460069498784254,
--50.096093600000025,
-],
-],
   "zoom": 15,
   "zoomControl": true,
   "preferCanvas": true,
@@ -202,7 +191,7 @@
 
         
     
-            var tile_layer_bcc4f93883c0740e654ee220dd792c1c = L.tileLayer(
+            var tile_layer_1d0e50de05a83c2f216592a58534b3dc = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 14,
@@ -219,10 +208,10 @@
             );
         
     
-            tile_layer_bcc4f93883c0740e654ee220dd792c1c.addTo(map_552931cc45bb086006610a4ee7e70da8);
+            tile_layer_1d0e50de05a83c2f216592a58534b3dc.addTo(map_dcd2848d18ba90e4f05f564b9c97051c);
         
     
-            var tile_layer_739f972f2e19adc73f98cfe34b24ea1f = L.tileLayer(
+            var tile_layer_47aee34b6d02462307b4c6e0319403d7 = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -239,7 +228,7 @@
             );
         
     
-            tile_layer_739f972f2e19adc73f98cfe34b24ea1f.addTo(map_552931cc45bb086006610a4ee7e70da8);
+            tile_layer_47aee34b6d02462307b4c6e0319403d7.addTo(map_dcd2848d18ba90e4f05f564b9c97051c);
         
 </script>
 </html>
