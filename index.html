@@ -6,11 +6,10 @@
     
     <style>
         #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); }
-        .rotulo-unico { color: white; font-weight: bold; background: rgba(0,0,0,0.6); padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid white; white-space: nowrap; }
+        .rotulo-unico { color: white; font-weight: bold; background: rgba(0,0,0,0.6); padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid white; white-space: nowrap; pointer-events: none; }
         #rodape-clealco { position: fixed; bottom: 10px; right: 10px; z-index: 9999; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 5px; font-family: sans-serif; font-size: 12px; font-weight: bold; color: #333; border: 1px solid #999; }
-        #legenda-tiros { position: fixed; bottom: 50px; left: 15px; z-index: 9999; background: white; padding: 10px; border: 2px solid #222; border-radius: 5px; font-family: sans-serif; font-size: 11px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); }
-        .legenda-item { display: flex; align-items: center; margin-bottom: 4px; }
-        .legenda-cor { width: 15px; height: 15px; margin-right: 8px; border: 1px solid #333; }
+        #legenda-tiro { position: fixed; bottom: 30px; left: 30px; z-index: 9999; background: white; padding: 10px; border-radius: 8px; border: 2px solid #222; font-family: sans-serif; font-size: 12px; display: block; box-shadow: 2px 2px 10px rgba(0,0,0,0.2); }
+        #legenda-tiro i { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border-radius: 2px; vertical-align: middle; }
     </style>
     
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
@@ -27,7 +26,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_6ab9f0fae3dc0ebf9c3d2a08d5f76fc4 {
+                #map_104dee7924c54d4234391eb1c60efdf3 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -73,15 +72,13 @@
         <input type="radio" name="tema" onclick="mudarTema(2)"> Classificação de exportação<br><br>
         <button onclick="location.reload()" style="width: 100%; padding: 8px; cursor: pointer; background: #eee; border: 1px solid #aaa; border-radius: 5px;">Resetar Visão</button>
     </div>
-    
-    <div id="legenda-tiros">
-        <b style="display:block; margin-bottom: 8px;">Legenda: Tiros</b>
-        <div class="legenda-item"><div class="legenda-cor" style="background:#ff0000"></div> 0 - 150</div>
-        <div class="legenda-item"><div class="legenda-cor" style="background:#ffff00"></div> 150 - 300</div>
-        <div class="legenda-item"><div class="legenda-cor" style="background:#00ff00"></div> 300 - 450</div>
-        <div class="legenda-item"><div class="legenda-cor" style="background:#00fffa"></div> > 450</div>
+    <div id="legenda-tiro">
+        <b style="font-size: 13px;">Legenda de Tiros</b><br><br>
+        <i style="background:#ff0000"></i> 0 - 150<br>
+        <i style="background:#ffff00"></i> 151 - 300<br>
+        <i style="background:#00ff00"></i> 301 - 450<br>
+        <i style="background:#00fffa"></i> > 450
     </div>
-
     <div id="rodape-clealco">Desenvolvido por Geotecnologia Clealco</div>
     
     
@@ -118,13 +115,8 @@
 
     function mudarTema(t) { 
         temaAtivo = t; 
+        document.getElementById('legenda-tiro').style.display = (t == 1) ? 'block' : 'none';
         refreshVisual(); 
-        // Esconde a legenda se for o tema de exportação
-        if(t == 1) {
-            $('#legenda-tiros').fadeIn();
-        } else {
-            $('#legenda-tiros').fadeOut();
-        }
     }
 
     function atualizarMapa() { 
@@ -166,7 +158,10 @@
     }
 
     function getCor(v) {
-        return v <= 150 ? '#ff0000' : v <= 300 ? '#ffff00' : v <= 450 ? '#00ff00' : '#00fffa';
+        if (v <= 150) return '#ff0000';
+        if (v <= 300) return '#ffff00';
+        if (v <= 450) return '#00ff00';
+        return '#00fffa';
     }
 
     function scanTiles(manifesto) {
@@ -185,14 +180,14 @@
     </script>
     
     
-            <div class="folium-map" id="map_6ab9f0fae3dc0ebf9c3d2a08d5f76fc4" ></div>
+            <div class="folium-map" id="map_104dee7924c54d4234391eb1c60efdf3" ></div>
         
 </body>
 <script>
     
     
-            var map_6ab9f0fae3dc0ebf9c3d2a08d5f76fc4 = L.map(
-                "map_6ab9f0fae3dc0ebf9c3d2a08d5f76fc4",
+            var map_104dee7924c54d4234391eb1c60efdf3 = L.map(
+                "map_104dee7924c54d4234391eb1c60efdf3",
                 {
                     center: [-21.83698501553575, -50.30343926982219],
                     crs: L.CRS.EPSG3857,
@@ -209,7 +204,7 @@
 
         
     
-            var tile_layer_c1f42ee88d655ab6b6b6efe0ec198279 = L.tileLayer(
+            var tile_layer_03447421f4cc3fb3e60dc11486c424b8 = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 0,
@@ -226,10 +221,10 @@
             );
         
     
-            tile_layer_c1f42ee88d655ab6b6b6efe0ec198279.addTo(map_6ab9f0fae3dc0ebf9c3d2a08d5f76fc4);
+            tile_layer_03447421f4cc3fb3e60dc11486c424b8.addTo(map_104dee7924c54d4234391eb1c60efdf3);
         
     
-            var tile_layer_4d6fd7cb227863ac57b36bc62fc76b04 = L.tileLayer(
+            var tile_layer_264dc37247b9c5beef0f06152e62a381 = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -246,7 +241,7 @@
             );
         
     
-            tile_layer_4d6fd7cb227863ac57b36bc62fc76b04.addTo(map_6ab9f0fae3dc0ebf9c3d2a08d5f76fc4);
+            tile_layer_264dc37247b9c5beef0f06152e62a381.addTo(map_104dee7924c54d4234391eb1c60efdf3);
         
 </script>
 </html>
