@@ -26,7 +26,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_de685fa17d371818c377c14e2e7d179c {
+                #map_3d534329b88f6a78438a3714286aaadc {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -107,28 +107,29 @@
             mapObj.createPane('pane_labels');
             mapObj.getPane('pane_labels').style.zIndex = 700;
 
-            // 1. CARREGAR DIVISAS (NASCEM OCULTAS)
             $.getJSON("divisas.json", function(data) {
                 camadaDivisas = L.geoJson(data, {
                     pane: 'pane_divisas',
-                    style: function(f) { return { color: "black", weight: 3, fillOpacity: 0, opacity: 0 }; }, // Opacidade ZERO no início
+                    style: function(f) { 
+                        // Elas nascem transparentes mas clicáveis
+                        return { color: "black", weight: 3, fillOpacity: 0, opacity: 0, interactive: true }; 
+                    },
                     onEachFeature: function(f, l) {
                         var p = f.properties;
                         l.bindPopup("<b>FAZENDA:</b> "+p.FAZENDA+"<br><b>NOME:</b> "+p.NOME_FAZ+"<br><b>ZONA:</b> "+p.ZONA+"<br><b>TALHÃO:</b> "+p.TALHAO+"<br><b>ÁREA:</b> "+p.AREA_TOTAL);
                     }
                 }).addTo(mapObj);
+                refreshVisual();
             });
 
-            // 2. CARREGAR LABELS
             $.getJSON("labels.json", function(data) {
                 data.forEach(function(l) {
                     var m = L.marker([l.lat, l.lng], { icon: L.divIcon({ className: 'rotulo-hd', html: l.talhao }), alt: l.fazenda, pane: 'pane_labels' });
                     marcadoresLabels.push(m);
                 });
-                refreshVisual(); // Força o estado zerado
+                refreshVisual();
             });
 
-            // 3. TILES
             $.getJSON("manifesto.json", function(data) {
                 mapObj.on('moveend', function() { scanTiles(data); });
                 scanTiles(data);
@@ -141,15 +142,17 @@
         refreshVisual(); 
         if (filtroFazenda !== "") {
             var pts = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
-            if (pts.length > 0) { mapObj.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 18 }); }
+            if (pts.length > 0) { 
+                var group = new L.featureGroup(marcadoresLabels.filter(m => m.options.alt === filtroFazenda));
+                mapObj.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 18 }); 
+            }
         }
     }
 
     function refreshVisual() {
-        // Se o filtro estiver vazio, apaga o mapa inteiro
         var showAll = (filtroFazenda !== "");
 
-        // FILTRO LINHAS
+        // ATUALIZAR LINHAS
         camadasLinhas.forEach(c => c.eachLayer(l => {
             var p = l.feature.properties;
             if (showAll && p.FAZENDA === filtroFazenda) {
@@ -159,55 +162,42 @@
             }
         }));
 
-        // FILTRO DIVISAS (Sincronizado com FAZENDA)
+        // ATUALIZAR DIVISAS (AQUI ESTAVA O SEU PROBLEMA)
         if (camadaDivisas) {
             camadaDivisas.eachLayer(l => {
                 var p = l.feature.properties;
-                if (showAll && p.FAZENDA === filtroFazenda) {
-                    l.setStyle({ color: "black", weight: 3, opacity: 1, fillOpacity: 0 });
+                // Compara ignorando maiúsculas/minúsculas para evitar erro de digitação
+                if (showAll && p.FAZENDA.toString().toUpperCase() === filtroFazenda.toUpperCase()) {
+                    l.setStyle({ opacity: 1, weight: 3, color: "black", fillOpacity: 0 });
                 } else {
                     l.setStyle({ opacity: 0, weight: 0, fillOpacity: 0 });
                 }
             });
         }
 
-        // FILTRO RÓTULOS
+        // ATUALIZAR RÓTULOS
         marcadoresLabels.forEach(m => {
             if (showAll && temaAtivo == 2 && m.options.alt === filtroFazenda) { m.addTo(mapObj); }
             else { mapObj.removeLayer(m); }
         });
     }
 
-    function scanTiles(manifesto) {
-        if (filtroFazenda === "") return; // Não carrega tiles se não houver filtro
-        var vB = mapObj.getBounds();
-        manifesto.forEach(t => {
-            if (vB.intersects(L.latLngBounds(t.bounds)) && !tilesCarregados.has(t.arquivo)) {
-                tilesCarregados.add(t.arquivo);
-                $.getJSON("tiles/" + t.arquivo, function(geo) {
-                    var layer = L.geoJson(geo).addTo(mapObj);
-                    camadasLinhas.push(layer);
-                    refreshVisual();
-                });
-            }
-        });
-    }
-
     function getCor(v) { return v <= 150 ? '#ff0000' : v <= 300 ? '#ffff00' : v <= 450 ? '#00ff00' : '#00fffa'; }
+    function scanTiles(manifesto) { if (filtroFazenda === "") return; var vB = mapObj.getBounds(); manifesto.forEach(t => { if (vB.intersects(L.latLngBounds(t.bounds)) && !tilesCarregados.has(t.arquivo)) { tilesCarregados.add(t.arquivo); $.getJSON("tiles/" + t.arquivo, function(geo) { var layer = L.geoJson(geo).addTo(mapObj); camadasLinhas.push(layer); refreshVisual(); }); } }); }
     function mudarTema(t) { temaAtivo = t; document.getElementById('legenda-tiro').style.display = (t == 1) ? 'block' : 'none'; refreshVisual(); }
     function toggleDivisas() { if (document.getElementById('chk_divisas').checked) { mapObj.addLayer(camadaDivisas); } else { mapObj.removeLayer(camadaDivisas); } }
     function toggleSatelite() { mapObj.eachLayer(l => { if (l._url && l._url.includes('google')) { if (document.getElementById('chk_satelite').checked) mapObj.addLayer(l); else mapObj.removeLayer(l); } }); }
     </script>
     
     
-            <div class="folium-map" id="map_de685fa17d371818c377c14e2e7d179c" ></div>
+            <div class="folium-map" id="map_3d534329b88f6a78438a3714286aaadc" ></div>
         
 </body>
 <script>
     
     
-            var map_de685fa17d371818c377c14e2e7d179c = L.map(
-                "map_de685fa17d371818c377c14e2e7d179c",
+            var map_3d534329b88f6a78438a3714286aaadc = L.map(
+                "map_3d534329b88f6a78438a3714286aaadc",
                 {
                     center: [-21.836988580224887, -50.30343928033729],
                     crs: L.CRS.EPSG3857,
@@ -224,7 +214,7 @@
 
         
     
-            var tile_layer_bc8181ade4c08c4bb424a880c0cc19f0 = L.tileLayer(
+            var tile_layer_7036a3b8e0c1b8f58292d161dd025b24 = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 14,
@@ -241,10 +231,10 @@
             );
         
     
-            tile_layer_bc8181ade4c08c4bb424a880c0cc19f0.addTo(map_de685fa17d371818c377c14e2e7d179c);
+            tile_layer_7036a3b8e0c1b8f58292d161dd025b24.addTo(map_3d534329b88f6a78438a3714286aaadc);
         
     
-            var tile_layer_d8bb3d664e8d409ee47d9c359aadfe2c = L.tileLayer(
+            var tile_layer_1375616a16e5ef991734b049d6f01488 = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -261,12 +251,12 @@
             );
         
     
-            tile_layer_d8bb3d664e8d409ee47d9c359aadfe2c.addTo(map_de685fa17d371818c377c14e2e7d179c);
+            tile_layer_1375616a16e5ef991734b049d6f01488.addTo(map_3d534329b88f6a78438a3714286aaadc);
         
     
-            var locate_control_9efd137ed40c11d88100de69e4c5d011 = L.control.locate(
+            var locate_control_88888387f49aaf3bdb0c81c1c3b5f189 = L.control.locate(
                 {"flyTo": true}
-            ).addTo(map_de685fa17d371818c377c14e2e7d179c);
+            ).addTo(map_3d534329b88f6a78438a3714286aaadc);
             
         
 </script>
