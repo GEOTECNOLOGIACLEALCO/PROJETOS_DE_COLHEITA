@@ -26,7 +26,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_dc68227da4e77acfb8bbc42adf8db933 {
+                #map_24165ace4b2cd562025d06aabb7f06f7 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -78,7 +78,7 @@
         <hr>
         <div style="font-size: 12px;">
             <b>⚙️ Visualização:</b><br>
-            <input type="checkbox" id="chk_divisas" checked onclick="toggleDivisas()"> Ver Todas as Divisas<br>
+            <input type="checkbox" id="chk_divisas" checked onclick="toggleDivisas()"> Ver Divisas Talhões<br>
             <input type="checkbox" id="chk_satelite" checked onclick="toggleSatelite()"> Imagem de Satélite
         </div>
         <br>
@@ -107,7 +107,7 @@
             mapObj.createPane('pane_labels');
             mapObj.getPane('pane_labels').style.zIndex = 700;
 
-            // 1. CARREGAR DIVISAS (TOTAIS - SEM FILTRO)
+            // 1. CARREGAR DIVISAS (FILTRADAS POR FAZENDA)
             $.getJSON("divisas.json", function(data) {
                 camadaDivisas = L.geoJson(data, {
                     pane: 'pane_divisas',
@@ -117,6 +117,7 @@
                         l.bindPopup("<b>FAZENDA:</b> "+p.FAZENDA+"<br><b>NOME:</b> "+p.NOME_FAZ+"<br><b>ZONA:</b> "+p.ZONA+"<br><b>TALHÃO:</b> "+p.TALHAO+"<br><b>ÁREA:</b> "+p.AREA_TOTAL);
                     }
                 }).addTo(mapObj);
+                refreshVisual(); // Força o filtro inicial na carga
             });
 
             // 2. CARREGAR LABELS
@@ -147,7 +148,7 @@
     }
 
     function refreshVisual() {
-        // FILTRO SÓ NAS LINHAS (TILES)
+        // FILTRAR AS LINHAS (TILES)
         camadasLinhas.forEach(c => c.eachLayer(l => {
             var p = l.feature.properties;
             if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
@@ -157,7 +158,19 @@
             }
         }));
 
-        // FILTRO NOS RÓTULOS
+        // FILTRAR AS DIVISAS DOS TALHÕES (CONTORNOS PRETOS)
+        if (camadaDivisas) {
+            camadaDivisas.eachLayer(l => {
+                var p = l.feature.properties;
+                if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
+                    l.setStyle({ opacity: 0, weight: 0, fillOpacity: 0 });
+                } else {
+                    l.setStyle({ color: "black", weight: 3, fillOpacity: 0, opacity: 1 });
+                }
+            });
+        }
+
+        // FILTRAR OS RÓTULOS (LABELS)
         marcadoresLabels.forEach(m => {
             if (temaAtivo == 2 && (filtroFazenda === "" || m.options.alt === filtroFazenda)) { m.addTo(mapObj); }
             else { mapObj.removeLayer(m); }
@@ -185,14 +198,14 @@
     </script>
     
     
-            <div class="folium-map" id="map_dc68227da4e77acfb8bbc42adf8db933" ></div>
+            <div class="folium-map" id="map_24165ace4b2cd562025d06aabb7f06f7" ></div>
         
 </body>
 <script>
     
     
-            var map_dc68227da4e77acfb8bbc42adf8db933 = L.map(
-                "map_dc68227da4e77acfb8bbc42adf8db933",
+            var map_24165ace4b2cd562025d06aabb7f06f7 = L.map(
+                "map_24165ace4b2cd562025d06aabb7f06f7",
                 {
                     center: [-21.836988580224887, -50.30343928033729],
                     crs: L.CRS.EPSG3857,
@@ -209,7 +222,7 @@
 
         
     
-            var tile_layer_70960cdd8e1037efa758f9899de4cb4e = L.tileLayer(
+            var tile_layer_c3c1faf3653a017c2b40b701a7fa0eae = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 14,
@@ -226,10 +239,10 @@
             );
         
     
-            tile_layer_70960cdd8e1037efa758f9899de4cb4e.addTo(map_dc68227da4e77acfb8bbc42adf8db933);
+            tile_layer_c3c1faf3653a017c2b40b701a7fa0eae.addTo(map_24165ace4b2cd562025d06aabb7f06f7);
         
     
-            var tile_layer_c4a3040738017c0198573de29b5e3893 = L.tileLayer(
+            var tile_layer_1ac2f57985c310f81f7e350eeb44c5aa = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -246,12 +259,12 @@
             );
         
     
-            tile_layer_c4a3040738017c0198573de29b5e3893.addTo(map_dc68227da4e77acfb8bbc42adf8db933);
+            tile_layer_1ac2f57985c310f81f7e350eeb44c5aa.addTo(map_24165ace4b2cd562025d06aabb7f06f7);
         
     
-            var locate_control_29849593047de19d1a05f643c7bc8952 = L.control.locate(
+            var locate_control_13bed2d7e236e9ab3c887406ca8e19c1 = L.control.locate(
                 {"flyTo": true}
-            ).addTo(map_dc68227da4e77acfb8bbc42adf8db933);
+            ).addTo(map_24165ace4b2cd562025d06aabb7f06f7);
             
         
 </script>
