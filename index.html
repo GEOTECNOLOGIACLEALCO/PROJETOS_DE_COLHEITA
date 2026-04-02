@@ -7,9 +7,9 @@
     <style>
         #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); }
         .rotulo-hd { color: black !important; font-weight: 900 !important; font-size: 18px !important; text-shadow: -3px -3px 0 #fff, 3px -3px 0 #fff, -3px 3px 0 #fff, 3px 3px 0 #fff, 0px 0px 10px #fff; white-space: nowrap; pointer-events: none; background: none !important; border: none !important; }
-        #rodape-clealco { position: fixed; bottom: 10px; right: 10px; z-index: 9999; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 5px; font-family: sans-serif; font-size: 11px; font-weight: bold; color: #333; border: 1px solid #999; }
         #legenda-tiro { position: fixed; bottom: 30px; left: 30px; z-index: 9999; background: white; padding: 10px; border-radius: 8px; border: 2px solid #222; font-family: sans-serif; font-size: 12px; }
         #legenda-tiro i { width: 12px; height: 12px; display: inline-block; margin-right: 8px; vertical-align: middle; }
+        #rodape-clealco { position: fixed; bottom: 10px; right: 10px; z-index: 9999; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 5px; font-family: sans-serif; font-size: 11px; font-weight: bold; color: #333; border: 1px solid #999; }
     </style>
     
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
@@ -26,7 +26,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_cbb9fd0849406acc638b3a6b38030e01 {
+                #map_42e18e59c81b033df983b6c8d295e3c0 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -73,7 +73,7 @@
         <div style="font-size: 12px;">
             <b>🎨 Temas:</b><br>
             <input type="radio" name="tema" onclick="mudarTema(1)" checked> Classificação de tiro<br>
-            <input type="radio" name="tema" onclick="mudarTema(2)"> Classificação de talhão
+            <input type="radio" name="tema" onclick="mudarTema(2)"> Classificação de exportação
         </div>
         <hr>
         <div style="font-size: 12px;">
@@ -82,7 +82,7 @@
             <input type="checkbox" id="chk_satelite" checked onclick="toggleSatelite()"> Imagem de Satélite
         </div>
         <br>
-        <button onclick="location.reload()" style="width: 100%; padding: 5px; cursor: pointer; border-radius: 5px;">🔄 Resetar Mapa</button>
+        <button onclick="location.reload()" style="width: 100%; padding: 5px; cursor: pointer;">🔄 Resetar Mapa</button>
     </div>
     <div id="legenda-tiro">
         <b>Legenda Tiros</b><br><br>
@@ -101,33 +101,43 @@
     $(document).ready(function() {
         setTimeout(function() {
             mapObj = window[document.querySelector('.folium-map').id];
-            mapObj.createPane('pane_divisas');
-            mapObj.getPane('pane_divisas').style.zIndex = 650;
-            mapObj.createPane('pane_labels');
-            mapObj.getPane('pane_labels').style.zIndex = 700;
+            
+            // Panes para Z-Index
+            mapObj.createPane('pane_divisas').style.zIndex = 650;
+            mapObj.createPane('pane_labels').style.zIndex = 700;
 
+            // 1. CARREGAR DIVISAS (Começam escondidas se não forem a primeira fazenda)
             $.getJSON("divisas.json", function(data) {
                 camadaDivisas = L.geoJson(data, {
                     pane: 'pane_divisas',
-                    style: { color: "black", weight: 3, fillOpacity: 0, interactive: true },
+                    style: function(feature) {
+                        var visivel = (filtroFazenda === "" || feature.properties.FAZENDA === filtroFazenda);
+                        return { 
+                            color: "black", 
+                            weight: visivel ? 3 : 0, 
+                            opacity: visivel ? 1 : 0, 
+                            fillOpacity: 0,
+                            interactive: visivel 
+                        };
+                    },
                     onEachFeature: function(f, l) {
                         var p = f.properties;
                         l.bindPopup("<b>FAZENDA:</b> "+p.FAZENDA+"<br><b>NOME:</b> "+p.NOME_FAZ+"<br><b>ZONA:</b> "+p.ZONA+"<br><b>TALHÃO:</b> "+p.TALHAO+"<br><b>ÁREA:</b> "+p.AREA_TOTAL);
                     }
                 }).addTo(mapObj);
-                refreshVisual(); // Garante que as divisas nasçam filtradas
             });
 
+            // 2. CARREGAR LABELS
             $.getJSON("labels.json", function(data) {
                 data.forEach(function(l) {
                     var m = L.marker([l.lat, l.lng], { icon: L.divIcon({ className: 'rotulo-hd', html: l.talhao }), alt: l.fazenda, pane: 'pane_labels' });
                     marcadoresLabels.push(m);
                 });
                 refreshVisual();
-                // Zoom inicial na primeira fazenda
                 if (filtroFazenda !== "") { atualizarMapa(); }
             });
 
+            // 3. CARREGAR TILES
             $.getJSON("manifesto.json", function(data) {
                 mapObj.on('moveend', function() { scanTiles(data); });
                 scanTiles(data);
@@ -145,28 +155,33 @@
     }
 
     function refreshVisual() {
-        // Filtrar Linhas (Tiles)
+        // FILTRAR LINHAS DE COLHEITA
         camadasLinhas.forEach(c => c.eachLayer(l => {
             var p = l.feature.properties;
-            if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) { l.setStyle({ opacity: 0, weight: 0 }); }
-            else { l.setStyle({ color: (temaAtivo == 1 ? getCor(p.CLASSE) : p.color_talhao), weight: 1, opacity: 0.8 }); }
+            var isFazenda = (filtroFazenda === "" || p.FAZENDA === filtroFazenda);
+            if (!isFazenda) {
+                l.setStyle({ opacity: 0, weight: 0, fillOpacity: 0 });
+            } else {
+                l.setStyle({ color: (temaAtivo == 1 ? getCor(p.CLASSE) : p.color_talhao), weight: 1, opacity: 0.8, fillOpacity: 0.4 });
+            }
         }));
 
-        // FILTRAR DIVISAS (NOVIDADE!)
+        // FILTRAR DIVISAS PRETAS
         if (camadaDivisas) {
             camadaDivisas.eachLayer(l => {
-                var p = l.feature.properties;
-                if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
-                    l.setStyle({ opacity: 0, weight: 0, fillOpacity: 0 });
+                var isFazenda = (filtroFazenda === "" || l.feature.properties.FAZENDA === filtroFazenda);
+                if (!isFazenda) {
+                    l.setStyle({ opacity: 0, weight: 0, interactive: false });
                 } else {
-                    l.setStyle({ color: "black", weight: 3, fillOpacity: 0 });
+                    l.setStyle({ color: "black", weight: 3, opacity: 1, interactive: true });
                 }
             });
         }
 
-        // Filtrar Rótulos
+        // FILTRAR RÓTULOS
         marcadoresLabels.forEach(m => {
-            if (temaAtivo == 2 && (filtroFazenda === "" || m.options.alt === filtroFazenda)) { m.addTo(mapObj); }
+            var isFazenda = (filtroFazenda === "" || m.options.alt === filtroFazenda);
+            if (temaAtivo == 2 && isFazenda) { m.addTo(mapObj); }
             else { mapObj.removeLayer(m); }
         });
     }
@@ -192,14 +207,14 @@
     </script>
     
     
-            <div class="folium-map" id="map_cbb9fd0849406acc638b3a6b38030e01" ></div>
+            <div class="folium-map" id="map_42e18e59c81b033df983b6c8d295e3c0" ></div>
         
 </body>
 <script>
     
     
-            var map_cbb9fd0849406acc638b3a6b38030e01 = L.map(
-                "map_cbb9fd0849406acc638b3a6b38030e01",
+            var map_42e18e59c81b033df983b6c8d295e3c0 = L.map(
+                "map_42e18e59c81b033df983b6c8d295e3c0",
                 {
                     center: [-21.836988580224887, -50.30343928033729],
                     crs: L.CRS.EPSG3857,
@@ -216,7 +231,7 @@
 
         
     
-            var tile_layer_00035585efb837f1304f914e0a3f6e2d = L.tileLayer(
+            var tile_layer_18aa57f6a06e330b15138fbc96dc9be1 = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 14,
@@ -233,10 +248,10 @@
             );
         
     
-            tile_layer_00035585efb837f1304f914e0a3f6e2d.addTo(map_cbb9fd0849406acc638b3a6b38030e01);
+            tile_layer_18aa57f6a06e330b15138fbc96dc9be1.addTo(map_42e18e59c81b033df983b6c8d295e3c0);
         
     
-            var tile_layer_2b032dd2a1ae6037562ddcf4c65222e8 = L.tileLayer(
+            var tile_layer_fe6f0a4aa12d6907e6fe5df797e4035d = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -253,12 +268,12 @@
             );
         
     
-            tile_layer_2b032dd2a1ae6037562ddcf4c65222e8.addTo(map_cbb9fd0849406acc638b3a6b38030e01);
+            tile_layer_fe6f0a4aa12d6907e6fe5df797e4035d.addTo(map_42e18e59c81b033df983b6c8d295e3c0);
         
     
-            var locate_control_eade8307599e4eef65fbc6ec000d26d6 = L.control.locate(
+            var locate_control_d74f56160fab5ae67bfa3e4961a44442 = L.control.locate(
                 {"flyTo": true}
-            ).addTo(map_cbb9fd0849406acc638b3a6b38030e01);
+            ).addTo(map_42e18e59c81b033df983b6c8d295e3c0);
             
         
 </script>
