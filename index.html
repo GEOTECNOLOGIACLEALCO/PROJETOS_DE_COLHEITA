@@ -26,7 +26,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_aae8906a3e3e084804e444f3b8c670e8 {
+                #map_cbb9fd0849406acc638b3a6b38030e01 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -67,7 +67,7 @@
     
     <div id="painel">
         <b style="font-size: 15px;">🚜 GESTÃO CLEALCO</b><br><br>
-        <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" placeholder="🔍 Buscar Fazenda..." style="width: 90%; padding: 8px; border-radius: 5px;">
+        <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" value="100453" placeholder="🔍 Buscar Fazenda..." style="width: 90%; padding: 8px; border-radius: 5px;">
         <datalist id="lista_fazendas"><option value="100453"><option value="107383"><option value="200501"><option value="202944"><option value="202948"></datalist>
         <hr>
         <div style="font-size: 12px;">
@@ -96,7 +96,7 @@
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-    var mapObj = null, tilesCarregados = new Set(), filtroFazenda = "", temaAtivo = 1, camadasLinhas = [], marcadoresLabels = [], camadaDivisas = null;
+    var mapObj = null, tilesCarregados = new Set(), filtroFazenda = "100453", temaAtivo = 1, camadasLinhas = [], marcadoresLabels = [], camadaDivisas = null;
 
     $(document).ready(function() {
         setTimeout(function() {
@@ -115,6 +115,7 @@
                         l.bindPopup("<b>FAZENDA:</b> "+p.FAZENDA+"<br><b>NOME:</b> "+p.NOME_FAZ+"<br><b>ZONA:</b> "+p.ZONA+"<br><b>TALHÃO:</b> "+p.TALHAO+"<br><b>ÁREA:</b> "+p.AREA_TOTAL);
                     }
                 }).addTo(mapObj);
+                refreshVisual(); // Garante que as divisas nasçam filtradas
             });
 
             $.getJSON("labels.json", function(data) {
@@ -123,6 +124,8 @@
                     marcadoresLabels.push(m);
                 });
                 refreshVisual();
+                // Zoom inicial na primeira fazenda
+                if (filtroFazenda !== "") { atualizarMapa(); }
             });
 
             $.getJSON("manifesto.json", function(data) {
@@ -132,14 +135,43 @@
         }, 600);
     });
 
-    function scanTiles(manifesto) {
-        // TRAVA DE SEGURANÇA: Se o zoom for menor que 16, não carrega nada. 
-        // Isso impede o celular de tentar processar tudo de longe e "morrer".
-        if (mapObj.getZoom() < 16 && filtroFazenda === "") {
-            console.log("Zoom muito longe. Aguardando aproximação para carregar linhas...");
-            return;
+    function atualizarMapa() { 
+        filtroFazenda = document.getElementById('input_fazenda').value;
+        refreshVisual(); 
+        if (filtroFazenda !== "") {
+            var pts = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
+            if (pts.length > 0) { mapObj.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 18 }); }
+        }
+    }
+
+    function refreshVisual() {
+        // Filtrar Linhas (Tiles)
+        camadasLinhas.forEach(c => c.eachLayer(l => {
+            var p = l.feature.properties;
+            if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) { l.setStyle({ opacity: 0, weight: 0 }); }
+            else { l.setStyle({ color: (temaAtivo == 1 ? getCor(p.CLASSE) : p.color_talhao), weight: 1, opacity: 0.8 }); }
+        }));
+
+        // FILTRAR DIVISAS (NOVIDADE!)
+        if (camadaDivisas) {
+            camadaDivisas.eachLayer(l => {
+                var p = l.feature.properties;
+                if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) {
+                    l.setStyle({ opacity: 0, weight: 0, fillOpacity: 0 });
+                } else {
+                    l.setStyle({ color: "black", weight: 3, fillOpacity: 0 });
+                }
+            });
         }
 
+        // Filtrar Rótulos
+        marcadoresLabels.forEach(m => {
+            if (temaAtivo == 2 && (filtroFazenda === "" || m.options.alt === filtroFazenda)) { m.addTo(mapObj); }
+            else { mapObj.removeLayer(m); }
+        });
+    }
+
+    function scanTiles(manifesto) {
         var vB = mapObj.getBounds();
         manifesto.forEach(t => {
             if (vB.intersects(L.latLngBounds(t.bounds)) && !tilesCarregados.has(t.arquivo)) {
@@ -153,23 +185,21 @@
         });
     }
 
-    function mudarTema(t) { temaAtivo = t; document.getElementById('legenda-tiro').style.display = (t == 1) ? 'block' : 'none'; refreshVisual(); }
-    function atualizarMapa() { filtroFazenda = document.getElementById('input_fazenda').value; refreshVisual(); if (filtroFazenda !== "") { var pts = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng()); if (pts.length > 0) { mapObj.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 18 }); } } }
-    function refreshVisual() { camadasLinhas.forEach(c => c.eachLayer(l => { var p = l.feature.properties; if (filtroFazenda !== "" && p.FAZENDA !== filtroFazenda) { l.setStyle({ opacity: 0, weight: 0 }); } else { l.setStyle({ color: (temaAtivo == 1 ? getCor(p.CLASSE) : p.color_talhao), weight: 1, opacity: 0.8 }); } })); marcadoresLabels.forEach(m => { if (temaAtivo == 2 && (filtroFazenda === "" || m.options.alt === filtroFazenda)) { m.addTo(mapObj); } else { mapObj.removeLayer(m); } }); }
     function getCor(v) { return v <= 150 ? '#ff0000' : v <= 300 ? '#ffff00' : v <= 450 ? '#00ff00' : '#00fffa'; }
+    function mudarTema(t) { temaAtivo = t; document.getElementById('legenda-tiro').style.display = (t == 1) ? 'block' : 'none'; refreshVisual(); }
     function toggleDivisas() { if (document.getElementById('chk_divisas').checked) { mapObj.addLayer(camadaDivisas); } else { mapObj.removeLayer(camadaDivisas); } }
     function toggleSatelite() { mapObj.eachLayer(l => { if (l._url && l._url.includes('google')) { if (document.getElementById('chk_satelite').checked) mapObj.addLayer(l); else mapObj.removeLayer(l); } }); }
     </script>
     
     
-            <div class="folium-map" id="map_aae8906a3e3e084804e444f3b8c670e8" ></div>
+            <div class="folium-map" id="map_cbb9fd0849406acc638b3a6b38030e01" ></div>
         
 </body>
 <script>
     
     
-            var map_aae8906a3e3e084804e444f3b8c670e8 = L.map(
-                "map_aae8906a3e3e084804e444f3b8c670e8",
+            var map_cbb9fd0849406acc638b3a6b38030e01 = L.map(
+                "map_cbb9fd0849406acc638b3a6b38030e01",
                 {
                     center: [-21.836988580224887, -50.30343928033729],
                     crs: L.CRS.EPSG3857,
@@ -186,7 +216,7 @@
 
         
     
-            var tile_layer_8e0ca4e0d67b3c965e3a2c32fde709ad = L.tileLayer(
+            var tile_layer_00035585efb837f1304f914e0a3f6e2d = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 14,
@@ -203,10 +233,10 @@
             );
         
     
-            tile_layer_8e0ca4e0d67b3c965e3a2c32fde709ad.addTo(map_aae8906a3e3e084804e444f3b8c670e8);
+            tile_layer_00035585efb837f1304f914e0a3f6e2d.addTo(map_cbb9fd0849406acc638b3a6b38030e01);
         
     
-            var tile_layer_dc65f6634f4ed15c535499827eac0622 = L.tileLayer(
+            var tile_layer_2b032dd2a1ae6037562ddcf4c65222e8 = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -223,12 +253,12 @@
             );
         
     
-            tile_layer_dc65f6634f4ed15c535499827eac0622.addTo(map_aae8906a3e3e084804e444f3b8c670e8);
+            tile_layer_2b032dd2a1ae6037562ddcf4c65222e8.addTo(map_cbb9fd0849406acc638b3a6b38030e01);
         
     
-            var locate_control_40f22b98d126f75ba80f72ee20655ee9 = L.control.locate(
+            var locate_control_eade8307599e4eef65fbc6ec000d26d6 = L.control.locate(
                 {"flyTo": true}
-            ).addTo(map_aae8906a3e3e084804e444f3b8c670e8);
+            ).addTo(map_cbb9fd0849406acc638b3a6b38030e01);
             
         
 </script>
