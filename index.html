@@ -6,10 +6,13 @@
     
     <link rel="manifest" href="./manifest.json">
     <style>
-        #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); transition: 0.3s; }
+        #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); transition: 0.3s ease; }
         #painel.minimizado { transform: translateX(-240px); }
         #btn-toggle { position: absolute; right: -40px; top: 0; background: #2e7d32; color: white; border: 2px solid #222; border-left: none; padding: 10px; cursor: pointer; border-radius: 0 5px 5px 0; font-weight: bold; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
-        .rotulo-hd { color: black !important; font-weight: 900 !important; font-size: 16px !important; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; pointer-events: none; }
+        .rotulo-hd { color: black !important; font-weight: 900 !important; font-size: 16px !important; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; pointer-events: none; background: none !important; border: none !important; }
+        #legenda { margin-top: 10px; font-size: 11px; }
+        .item-leg { display: flex; align-items: center; margin-bottom: 2px; }
+        .cor-leg { width: 12px; height: 12px; margin-right: 5px; border: 1px solid #000; }
     </style>
     
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
@@ -26,7 +29,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_7940764551ed41e471542dfefb1989dd {
+                #map_c148945dc4ca8de4502ceab0a55cd22a {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -65,15 +68,29 @@
     
     <div id="painel">
         <div id="btn-toggle" onclick="toggleMenu()">☰</div>
-        <b style="font-size: 15px;">🚜 GESTÃO CLEALCO</b><hr>
+        <b style="font-size: 14px;">🚜 GESTÃO CLEALCO</b><hr>
         <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" placeholder="🔍 Buscar Fazenda..." style="width: 90%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
         <datalist id="lista_fazendas"><option value="100453"><option value="107383"><option value="200501"><option value="202944"><option value="202948"></datalist>
+        
+        <div style="font-size: 12px; margin-top: 10px;">
+            <b>🎨 TEMAS:</b><br>
+            <input type="radio" name="tema" onclick="mudarTema(1)" checked> Classif. Tiro Médio<br>
+            <input type="radio" name="tema" onclick="mudarTema(2)"> Classif. Talhão
+        </div>
+        
+        <div id="legenda">
+            <div class="item-leg"><div class="cor-leg" style="background:#ff0000"></div> 0 - 150 (Curto)</div>
+            <div class="item-leg"><div class="cor-leg" style="background:#ffff00"></div> 151 - 300 (Médio)</div>
+            <div class="item-leg"><div class="cor-leg" style="background:#00ff00"></div> 301 - 450 (Longo)</div>
+            <div class="item-leg"><div class="cor-leg" style="background:#00fffa"></div> > 450 (Extra)</div>
+        </div>
+
         <hr>
         <div style="font-size: 12px;">
             <input type="checkbox" id="chk_divisas" checked onclick="toggleDivisas()"> Ver Divisas<br>
             <input type="checkbox" id="chk_satelite" checked onclick="toggleSatelite()"> Satélite
         </div>
-        <button onclick="location.reload()" style="width: 100%; margin-top: 10px; padding: 5px; cursor: pointer; border-radius: 5px;">🔄 Sincronizar Tudo</button>
+        <button onclick="location.reload()" style="width: 100%; margin-top: 10px; padding: 6px; cursor: pointer; background: #eee; border: 1px solid #ccc; border-radius: 4px;">🔄 Resetar / Sincronizar</button>
     </div>
     
     
@@ -83,7 +100,7 @@
         navigator.serviceWorker.register('./sw.js').then(() => console.log("Offline OK"));
     }
 
-    var mapObj, tilesCarregados = new Set(), filtroFazenda = "", camadaDivisas = null, camadasLinhas = [], marcadoresLabels = [];
+    var mapObj, tilesCarregados = new Set(), filtroFazenda = "", temaAtivo = 1, camadaDivisas = null, camadasLinhas = [], marcadoresLabels = [];
 
     function toggleMenu() { document.getElementById('painel').classList.toggle('minimizado'); }
 
@@ -94,7 +111,10 @@
             
             $.getJSON("labels.json", function(data) {
                 data.forEach(function(l) {
-                    var m = L.marker([l.lat, l.lng], { icon: L.divIcon({ className: 'rotulo-hd', html: l.talhao }), alt: l.fazenda });
+                    var m = L.marker([l.lat, l.lng], { 
+                        icon: L.divIcon({ className: 'rotulo-hd', html: l.talhao }), 
+                        alt: l.fazenda.toString().trim().toUpperCase() 
+                    });
                     marcadoresLabels.push(m);
                 });
             });
@@ -107,9 +127,9 @@
     });
 
     function atualizarMapa() { 
-        var novaFazenda = document.getElementById('input_fazenda').value;
-        if (!novaFazenda || novaFazenda === filtroFazenda) return;
-        filtroFazenda = novaFazenda;
+        var inputVal = document.getElementById('input_fazenda').value.trim().toUpperCase();
+        if (!inputVal || inputVal === filtroFazenda) return;
+        filtroFazenda = inputVal;
 
         if (camadaDivisas) { mapObj.removeLayer(camadaDivisas); }
 
@@ -117,37 +137,42 @@
         $.getJSON("divisas_split/" + nomeArquivo, function(data) {
             camadaDivisas = L.geoJson(data, {
                 pane: 'pane_divisas',
-                style: function(f) { return { color: "black", weight: 2, fillOpacity: 0.1 }; },
+                style: { color: "black", weight: 2, fillOpacity: 0.1 },
                 onEachFeature: function(f, l) {
                     var h = "<b>INFO TALHÃO</b><hr>";
-                    for (var k in f.properties) h += "<b>" + k + ":</b> " + f.properties[k] + "<br>";
+                    for (var k in f.properties) h += "<b>"+k+":</b> "+f.properties[k]+"<br>";
                     l.bindPopup(h);
                 }
             }).addTo(mapObj);
-        });
+        }).fail(function() { console.warn("Divisa não encontrada para esta fazenda."); });
 
         refreshVisual(); 
-        var pts = marcadoresLabels.filter(m => m.options.alt.toString().toUpperCase() === filtroFazenda.toUpperCase()).map(m => m.getLatLng());
+        var pts = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
         if (pts.length > 0) mapObj.fitBounds(L.latLngBounds(pts), { padding: [50, 50] });
     }
 
     function refreshVisual() {
         var show = (filtroFazenda !== "");
-        var filtroF = filtroFazenda.toString().toUpperCase().trim();
-        
         camadasLinhas.forEach(function(c) {
             c.eachLayer(function(l) {
                 var p = l.feature.properties;
-                var match = show && p.FAZENDA.toString().toUpperCase().trim() === filtroF;
-                l.setStyle({ opacity: match ? 0.8 : 0, weight: match ? 1 : 0, interactive: match });
+                var match = show && p.FAZENDA.toString().trim().toUpperCase() === filtroFazenda;
+                l.setStyle({ 
+                    opacity: match ? 0.8 : 0, 
+                    weight: match ? 1 : 0, 
+                    color: (temaAtivo == 1 ? getCorTiro(p.CLASSE) : p.color_talhao),
+                    interactive: match
+                });
             });
         });
         marcadoresLabels.forEach(function(m) {
-            if (show && m.options.alt.toString().toUpperCase().trim() === filtroF) m.addTo(mapObj); else mapObj.removeLayer(m);
+            if (show && m.options.alt === filtroFazenda) m.addTo(mapObj); else mapObj.removeLayer(m);
         });
     }
 
-    function getCor(v) { return v <= 150 ? '#ff0000' : v <= 300 ? '#ffff00' : v <= 450 ? '#00ff00' : '#00fffa'; }
+    function getCorTiro(v) { 
+        return v <= 150 ? '#ff0000' : v <= 300 ? '#ffff00' : v <= 450 ? '#00ff00' : '#00fffa'; 
+    }
     
     function scanTiles(manifesto) { 
         if (!filtroFazenda) return;
@@ -157,8 +182,7 @@
                 tilesCarregados.add(t.arquivo);
                 $.getJSON("tiles/" + t.arquivo, function(geo) {
                     var layer = L.geoJson(geo, { 
-                        style: function(f) { return { color: getCor(f.properties.CLASSE), weight: 0, opacity: 0 }; },
-                        onEachFeature: (f, l) => l.bindPopup("<b>Comp:</b> " + f.properties.COMP_M.toFixed(1) + "m") 
+                        onEachFeature: (f, l) => l.bindPopup("<b>Comprimento:</b> " + f.properties.COMP_M.toFixed(1) + "m") 
                     }).addTo(mapObj);
                     camadasLinhas.push(layer);
                     refreshVisual();
@@ -167,25 +191,38 @@
         });
     }
 
-    function toggleDivisas() { if (camadaDivisas) { if (document.getElementById('chk_divisas').checked) mapObj.addLayer(camadaDivisas); else mapObj.removeLayer(camadaDivisas); } }
+    function mudarTema(t) { 
+        temaAtivo = t; 
+        document.getElementById('legenda').style.display = (t == 1) ? 'block' : 'none';
+        refreshVisual(); 
+    }
+
+    function toggleDivisas() { 
+        if (camadaDivisas) { 
+            if (document.getElementById('chk_divisas').checked) mapObj.addLayer(camadaDivisas); 
+            else mapObj.removeLayer(camadaDivisas); 
+        } 
+    }
+
     function toggleSatelite() { 
         mapObj.eachLayer(function(l) { 
             if (l._url && (l._url.includes('google') || l._url.includes('mt1'))) { 
-                if (document.getElementById('chk_satelite').checked) mapObj.addLayer(l); else mapObj.removeLayer(l); 
+                if (document.getElementById('chk_satelite').checked) mapObj.addLayer(l); 
+                else mapObj.removeLayer(l); 
             } 
         }); 
     }
     </script>
     
     
-            <div class="folium-map" id="map_7940764551ed41e471542dfefb1989dd" ></div>
+            <div class="folium-map" id="map_c148945dc4ca8de4502ceab0a55cd22a" ></div>
         
 </body>
 <script>
     
     
-            var map_7940764551ed41e471542dfefb1989dd = L.map(
-                "map_7940764551ed41e471542dfefb1989dd",
+            var map_c148945dc4ca8de4502ceab0a55cd22a = L.map(
+                "map_c148945dc4ca8de4502ceab0a55cd22a",
                 {
                     center: [-21.57265, -50.37255],
                     crs: L.CRS.EPSG3857,
@@ -202,7 +239,7 @@
 
         
     
-            var tile_layer_60ca499c2634a252540974ba3e18e424 = L.tileLayer(
+            var tile_layer_b312e39271d948da62256ff33405902f = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 0,
@@ -219,17 +256,17 @@
             );
         
     
-            tile_layer_60ca499c2634a252540974ba3e18e424.addTo(map_7940764551ed41e471542dfefb1989dd);
+            tile_layer_b312e39271d948da62256ff33405902f.addTo(map_c148945dc4ca8de4502ceab0a55cd22a);
         
     
-            var tile_layer_cfbe1954f4b7bf920efe6dcb726c1ca7 = L.tileLayer(
+            var tile_layer_1c1e4a4feeca2962ebd5fbf9236cfde8 = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
   "maxZoom": 22,
   "maxNativeZoom": 22,
   "noWrap": false,
-  "attribution": "Google",
+  "attribution": "Google Sat\u00e9lite",
   "subdomains": "abc",
   "detectRetina": false,
   "tms": false,
@@ -239,7 +276,7 @@
             );
         
     
-            tile_layer_cfbe1954f4b7bf920efe6dcb726c1ca7.addTo(map_7940764551ed41e471542dfefb1989dd);
+            tile_layer_1c1e4a4feeca2962ebd5fbf9236cfde8.addTo(map_c148945dc4ca8de4502ceab0a55cd22a);
         
 </script>
 </html>
