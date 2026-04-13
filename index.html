@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+    <link rel="manifest" href="./manifest.json">
+    <style>
+        #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); transition: 0.3s; }
+        #painel.minimizado { transform: translateX(-240px); }
+        #btn-toggle { position: absolute; right: -40px; top: 0; background: #2e7d32; color: white; border: 2px solid #222; border-left: none; padding: 10px; cursor: pointer; border-radius: 0 5px 5px 0; font-weight: bold; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+        .rotulo-hd { color: black !important; font-weight: 900 !important; font-size: 16px !important; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; pointer-events: none; }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_4a125e4f6fcfc78781684cb6590be206 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+    <div id="painel">
+        <div id="btn-toggle" onclick="toggleMenu()">☰</div>
+        <b style="font-size: 15px;">🚜 GESTÃO CLEALCO</b><hr>
+        <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" placeholder="🔍 Buscar Fazenda..." style="width: 90%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+        <datalist id="lista_fazendas"><option value="100453"><option value="107383"><option value="200501"><option value="202944"><option value="202948"></datalist>
+        <hr>
+        <div style="font-size: 12px;">
+            <input type="checkbox" id="chk_divisas" checked onclick="toggleDivisas()"> Ver Divisas<br>
+            <input type="checkbox" id="chk_satelite" checked onclick="toggleSatelite()"> Satélite
+        </div>
+        <button onclick="location.reload()" style="width: 100%; margin-top: 10px; padding: 5px; cursor: pointer; border-radius: 5px;">🔄 Sincronizar Tudo</button>
+    </div>
+    
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').then(() => console.log("Cache offline pronto!"));
+    }
+
+    var mapObj, tilesCarregados = new Set(), filtroFazenda = "", camadaDivisas = null, camadasLinhas = [], marcadoresLabels = [];
+
+    function toggleMenu() { document.getElementById('painel').classList.toggle('minimizado'); }
+
+    $(document).ready(function() {
+        setTimeout(function() {
+            mapObj = window[document.querySelector('.folium-map').id];
+            mapObj.createPane('pane_divisas').style.zIndex = 650;
+            
+            $.getJSON("labels.json", function(data) {
+                data.forEach(function(l) {
+                    var m = L.marker([l.lat, l.lng], { icon: L.divIcon({ className: 'rotulo-hd', html: l.talhao }), alt: l.fazenda });
+                    marcadoresLabels.push(m);
+                });
+            });
+
+            $.getJSON("manifesto.json", function(data) {
+                mapObj.on('moveend', function() { scanTiles(data); });
+                scanTiles(data);
+            });
+        }, 600);
+    });
+
+    function atualizarMapa() { 
+        var novaFazenda = document.getElementById('input_fazenda').value;
+        if (novaFazenda === filtroFazenda) return;
+        filtroFazenda = novaFazenda;
+
+        if (camadaDivisas) { mapObj.removeLayer(camadaDivisas); }
+
+        if (filtroFazenda) {
+            // Carrega apenas o arquivo JSON da fazenda escolhida
+            var nomeArquivo = "divisas_" + filtroFazenda.replace(/ /g, "_") + ".json";
+            $.getJSON("divisas_split/" + nomeArquivo, function(data) {
+                camadaDivisas = L.geoJson(data, {
+                    pane: 'pane_divisas',
+                    style: function(f) { return { color: "black", weight: 2, fillOpacity: 0.1 }; },
+                    onEachFeature: function(f, l) {
+                        var h = "<b>INFO TALHÃO</b><hr>";
+                        for (var k in f.properties) h += "<b>" + k + ":</b> " + f.properties[k] + "<br>";
+                        l.bindPopup(h);
+                    }
+                }).addTo(mapObj);
+            });
+
+            refreshVisual(); 
+            var pts = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
+            if (pts.length > 0) mapObj.fitBounds(L.latLngBounds(pts), { padding: [50, 50] });
+        }
+    }
+
+    function refreshVisual() {
+        var show = (filtroFazenda !== "");
+        camadasLinhas.forEach(function(c) {
+            c.eachLayer(function(l) {
+                var m = show && l.feature.properties.FAZENDA === filtroFazenda;
+                l.setStyle({ opacity: m ? 0.8 : 0, weight: m ? 1 : 0, color: getCor(l.feature.properties.CLASSE) });
+            });
+        });
+        marcadoresLabels.forEach(function(m) {
+            if (show && m.options.alt === filtroFazenda) m.addTo(mapObj); else mapObj.removeLayer(m);
+        });
+    }
+
+    function getCor(v) { return v <= 150 ? '#ff0000' : v <= 300 ? '#ffff00' : v <= 450 ? '#00ff00' : '#00fffa'; }
+    
+    function scanTiles(manifesto) { 
+        if (!filtroFazenda) return;
+        var vB = mapObj.getBounds();
+        manifesto.forEach(function(t) {
+            if (vB.intersects(L.latLngBounds(t.bounds)) && !tilesCarregados.has(t.arquivo)) {
+                tilesCarregados.add(t.arquivo);
+                $.getJSON("tiles/" + t.arquivo, function(geo) {
+                    var layer = L.geoJson(geo, { 
+                        onEachFeature: (f, l) => l.bindPopup("<b>Comp. Linha:</b> " + f.properties.COMP_M.toFixed(1) + "m") 
+                    }).addTo(mapObj);
+                    camadasLinhas.push(layer);
+                    refreshVisual();
+                });
+            }
+        });
+    }
+
+    function toggleDivisas() { if (camadaDivisas) { if (document.getElementById('chk_divisas').checked) mapObj.addLayer(camadaDivisas); else mapObj.removeLayer(camadaDivisas); } }
+    function toggleSatelite() { mapObj.eachLayer(l => { if (l._url && l._url.includes('google')) { if (document.getElementById('chk_satelite').checked) mapObj.addLayer(l); else mapObj.removeLayer(l); } }); }
+    </script>
+    
+    
+            <div class="folium-map" id="map_4a125e4f6fcfc78781684cb6590be206" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_4a125e4f6fcfc78781684cb6590be206 = L.map(
+                "map_4a125e4f6fcfc78781684cb6590be206",
+                {
+                    center: [-21.57265, -50.37255],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 15,
+  "zoomControl": true,
+  "preferCanvas": true,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_faefc312c992ed4999e9cb8fb80802e0 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 22,
+  "maxNativeZoom": 22,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_faefc312c992ed4999e9cb8fb80802e0.addTo(map_4a125e4f6fcfc78781684cb6590be206);
+        
+    
+            var tile_layer_77067289bc7b52724fe09d73731f2f0d = L.tileLayer(
+                "https://mt1.google.com/vt/lyrs=y\u0026x=\u0026y=\u0026z=",
+                {
+  "minZoom": 0,
+  "maxZoom": 22,
+  "maxNativeZoom": 22,
+  "noWrap": false,
+  "attribution": "Google",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_77067289bc7b52724fe09d73731f2f0d.addTo(map_4a125e4f6fcfc78781684cb6590be206);
+        
+</script>
+</html>
