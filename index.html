@@ -6,13 +6,13 @@
     
     <link rel="manifest" href="./manifest.json">
     <style>
-        #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 230px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); transition: 0.3s ease; }
-        #painel.minimizado { transform: translateX(-240px); }
-        #btn-toggle { position: absolute; right: -40px; top: 0; background: #2e7d32; color: white; border: 2px solid #222; border-left: none; padding: 10px; cursor: pointer; border-radius: 0 5px 5px 0; font-weight: bold; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+        #painel { position: fixed; top: 15px; left: 50px; z-index: 9999; background: white; padding: 15px; border: 2px solid #222; border-radius: 10px; font-family: sans-serif; width: 240px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); transition: 0.3s; }
+        #painel.minimizado { transform: translateX(-250px); }
+        #btn-toggle { position: absolute; right: -45px; top: 0; background: #2e7d32; color: white; border: 2px solid #222; border-left: none; padding: 10px; cursor: pointer; border-radius: 0 5px 5px 0; font-weight: bold; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; }
         .rotulo-hd { color: black !important; font-weight: 900 !important; font-size: 16px !important; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; pointer-events: none; background: none !important; border: none !important; }
-        #legenda { margin-top: 10px; font-size: 11px; }
+        #legenda-container { margin-top: 10px; font-size: 11px; }
         .item-leg { display: flex; align-items: center; margin-bottom: 2px; }
-        .cor-leg { width: 12px; height: 12px; margin-right: 5px; border: 1px solid #000; }
+        .cor-leg { width: 14px; height: 14px; margin-right: 5px; border: 1px solid #000; }
     </style>
     
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
@@ -29,7 +29,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_c148945dc4ca8de4502ceab0a55cd22a {
+                #map_9195ee96a21918629b3dabac7693cbe1 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -68,17 +68,17 @@
     
     <div id="painel">
         <div id="btn-toggle" onclick="toggleMenu()">☰</div>
-        <b style="font-size: 14px;">🚜 GESTÃO CLEALCO</b><hr>
+        <b style="font-size: 15px;">🚜 GESTÃO CLEALCO</b><hr>
         <input list="lista_fazendas" id="input_fazenda" oninput="atualizarMapa()" placeholder="🔍 Buscar Fazenda..." style="width: 90%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
         <datalist id="lista_fazendas"><option value="100453"><option value="107383"><option value="200501"><option value="202944"><option value="202948"></datalist>
         
         <div style="font-size: 12px; margin-top: 10px;">
             <b>🎨 TEMAS:</b><br>
-            <input type="radio" name="tema" onclick="mudarTema(1)" checked> Classif. Tiro Médio<br>
-            <input type="radio" name="tema" onclick="mudarTema(2)"> Classif. Talhão
+            <label><input type="radio" name="tema" onclick="mudarTema(1)" checked> Classif. Tiro Médio</label><br>
+            <label><input type="radio" name="tema" onclick="mudarTema(2)"> Classif. Talhão</label>
         </div>
         
-        <div id="legenda">
+        <div id="legenda-container">
             <div class="item-leg"><div class="cor-leg" style="background:#ff0000"></div> 0 - 150 (Curto)</div>
             <div class="item-leg"><div class="cor-leg" style="background:#ffff00"></div> 151 - 300 (Médio)</div>
             <div class="item-leg"><div class="cor-leg" style="background:#00ff00"></div> 301 - 450 (Longo)</div>
@@ -87,17 +87,17 @@
 
         <hr>
         <div style="font-size: 12px;">
-            <input type="checkbox" id="chk_divisas" checked onclick="toggleDivisas()"> Ver Divisas<br>
-            <input type="checkbox" id="chk_satelite" checked onclick="toggleSatelite()"> Satélite
+            <label><input type="checkbox" id="chk_divisas" checked onclick="toggleDivisas()"> Ver Divisas</label><br>
+            <label><input type="checkbox" id="chk_satelite" checked onclick="toggleSatelite()"> Satélite</label>
         </div>
-        <button onclick="location.reload()" style="width: 100%; margin-top: 10px; padding: 6px; cursor: pointer; background: #eee; border: 1px solid #ccc; border-radius: 4px;">🔄 Resetar / Sincronizar</button>
+        <button onclick="location.reload()" style="width: 100%; margin-top: 10px; padding: 8px; cursor: pointer; background: #f0f0f0; border: 1px solid #999; border-radius: 5px;">🔄 Atualizar / Sync</button>
     </div>
     
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').then(() => console.log("Offline OK"));
+        navigator.serviceWorker.register('./sw.js').then(() => console.log("SW Carregado!"));
     }
 
     var mapObj, tilesCarregados = new Set(), filtroFazenda = "", temaAtivo = 1, camadaDivisas = null, camadasLinhas = [], marcadoresLabels = [];
@@ -117,6 +117,7 @@
                     });
                     marcadoresLabels.push(m);
                 });
+                console.log("Labels carregados.");
             });
 
             $.getJSON("manifesto.json", function(data) {
@@ -144,7 +145,8 @@
                     l.bindPopup(h);
                 }
             }).addTo(mapObj);
-        }).fail(function() { console.warn("Divisa não encontrada para esta fazenda."); });
+            console.log("Divisas carregadas: " + nomeArquivo);
+        });
 
         refreshVisual(); 
         var pts = marcadoresLabels.filter(m => m.options.alt === filtroFazenda).map(m => m.getLatLng());
@@ -193,7 +195,7 @@
 
     function mudarTema(t) { 
         temaAtivo = t; 
-        document.getElementById('legenda').style.display = (t == 1) ? 'block' : 'none';
+        document.getElementById('legenda-container').style.display = (t == 1) ? 'block' : 'none';
         refreshVisual(); 
     }
 
@@ -215,14 +217,14 @@
     </script>
     
     
-            <div class="folium-map" id="map_c148945dc4ca8de4502ceab0a55cd22a" ></div>
+            <div class="folium-map" id="map_9195ee96a21918629b3dabac7693cbe1" ></div>
         
 </body>
 <script>
     
     
-            var map_c148945dc4ca8de4502ceab0a55cd22a = L.map(
-                "map_c148945dc4ca8de4502ceab0a55cd22a",
+            var map_9195ee96a21918629b3dabac7693cbe1 = L.map(
+                "map_9195ee96a21918629b3dabac7693cbe1",
                 {
                     center: [-21.57265, -50.37255],
                     crs: L.CRS.EPSG3857,
@@ -239,7 +241,7 @@
 
         
     
-            var tile_layer_b312e39271d948da62256ff33405902f = L.tileLayer(
+            var tile_layer_d53501cb6fa22846f3b93a44faec9d7a = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 0,
@@ -256,10 +258,10 @@
             );
         
     
-            tile_layer_b312e39271d948da62256ff33405902f.addTo(map_c148945dc4ca8de4502ceab0a55cd22a);
+            tile_layer_d53501cb6fa22846f3b93a44faec9d7a.addTo(map_9195ee96a21918629b3dabac7693cbe1);
         
     
-            var tile_layer_1c1e4a4feeca2962ebd5fbf9236cfde8 = L.tileLayer(
+            var tile_layer_88019828fb207d8a5fa8fcfae154444b = L.tileLayer(
                 "https://mt1.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}",
                 {
   "minZoom": 0,
@@ -276,7 +278,7 @@
             );
         
     
-            tile_layer_1c1e4a4feeca2962ebd5fbf9236cfde8.addTo(map_c148945dc4ca8de4502ceab0a55cd22a);
+            tile_layer_88019828fb207d8a5fa8fcfae154444b.addTo(map_9195ee96a21918629b3dabac7693cbe1);
         
 </script>
 </html>
