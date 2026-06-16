@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "divisas_308162",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "NOME_FAZ": "SITIO SANTA HELENA", "ZONA": 1, "TALHAO": 1, "AREA_TOTAL": 29.85, "FAZENDA": "308162" }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -50.49902, -21.3224 ], [ -50.49708, -21.32812 ], [ -50.50079, -21.32943 ], [ -50.50268, -21.32569 ], [ -50.50196, -21.32541 ], [ -50.49977, -21.325 ], [ -50.49902, -21.3224 ] ] ], [ [ [ -50.50457, -21.31921 ], [ -50.5019, -21.32498 ], [ -50.5019, -21.32522 ], [ -50.50177, -21.32534 ], [ -50.5027, -21.32565 ], [ -50.50551, -21.3203 ], [ -50.50457, -21.31921 ] ] ] ] } },
+{ "type": "Feature", "properties": { "NOME_FAZ": "SITIO SANTA HELENA", "ZONA": 1, "TALHAO": 2, "AREA_TOTAL": 22.15, "FAZENDA": "308162" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -50.49706, -21.32817 ], [ -50.49569, -21.33224 ], [ -50.49569, -21.33254 ], [ -50.49788, -21.33513 ], [ -50.50077, -21.32947 ], [ -50.49706, -21.32817 ] ] ] } }
+]
+}
