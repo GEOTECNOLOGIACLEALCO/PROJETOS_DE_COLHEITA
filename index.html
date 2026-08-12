@@ -58,11 +58,8 @@
     .fab-group { position: absolute; bottom: 80px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; align-items: flex-end; }
     .fab { width: 45px; height: 45px; border-radius: 50%; border: none; color: white; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
     .fab-compass { background: linear-gradient(135deg, #8b5cf6, #6d28d9); font-size: 20px;} 
-    .fab-rotate { background: linear-gradient(135deg, #4b5563, #334155); } 
     .fab-gps { background: linear-gradient(135deg, #0284c7, #2563eb); }
     .fab-reset { background: linear-gradient(135deg, #475569, #334155); }
-
-    .rotation-group { display: flex; gap: 8px; }
 
     /* LEGENDA FLUTUANTE */
     #map-legend { position: absolute; bottom: 80px; left: 16px; z-index: 1000; padding: 12px; border-radius: 12px; display: none; flex-direction: column; gap: 6px; max-width: 250px; }
@@ -105,7 +102,7 @@
       <div class="header-bar glass">
         <div>
           <div class="title">FERTIRRIGAÇÃO | CLEALCO</div>
-          <div class="updated-at">Atualizado em: 12/08/2026 14:07</div>
+          <div class="updated-at">Atualizado em: 12/08/2026 16:13</div>
         </div>
         <button class="btn-toggle" onclick="toggleMenu()"><span>👁️</span> Menu</button>
       </div>
@@ -152,12 +149,8 @@
     <div id="map-legend" class="glass"></div>
 
     <div class="fab-group">
-      <!-- BOTÕES DE ROTAÇÃO MANUAL E BÚSSOLA -->
-      <div class="rotation-group">
-          <button class="fab fab-rotate" onclick="rotateMap(-15)" title="Girar Esquerda">↺</button>
-          <button class="fab fab-compass" onclick="resetRotation()" title="Alinhar ao Norte (Voltar Reto)">🧭</button>
-          <button class="fab fab-rotate" onclick="rotateMap(15)" title="Girar Direita">↻</button>
-      </div>
+      <!-- APENAS A BÚSSOLA DE ROTACIONAR PARA O NORTE -->
+      <button class="fab fab-compass" onclick="resetRotation()" title="Alinhar ao Norte (Voltar Reto)">🧭</button>
       <button class="fab fab-gps" onclick="locateUser()" title="Minha Localização">🎯</button>
       <button class="fab fab-reset" onclick="resetView()" title="Visão Geral">🔄</button>
     </div>
@@ -199,7 +192,6 @@
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   
   <script>
-    // Inicialização MapLibre (Motor WebGL)
     const map = new maplibregl.Map({
         container: 'map',
         style: {
@@ -223,8 +215,8 @@
         center: [-50.3, -21.2],
         zoom: 6,
         pitchWithRotate: false, 
-        dragRotate: true,       // Gira no PC (Botão direito do mouse)
-        touchZoomRotate: true   // Gira no Celular (Dois dedos)
+        dragRotate: true,       
+        touchZoomRotate: true   
     });
 
     let rawData = null;
@@ -254,11 +246,6 @@
     function formatNumber(num) {
       return num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     }
-    
-    // Controles de Rotação Manual
-    function rotateMap(delta) {
-        map.easeTo({ bearing: map.getBearing() + delta, duration: 300 });
-    }
 
     function resetRotation() {
         map.resetNorthPitch();
@@ -287,8 +274,9 @@
       fetch('./data.geojson').then(r => r.json()),
       fetch('./talhoes.geojson').then(r => r.json()),
       fetch('./perimetro.geojson').then(r => r.json()),
-      fetch('./indicadores.json').then(r => r.json())
-    ]).then(([linhasData, talhoesData, perimetroData, indicData]) => {
+      fetch('./indicadores.json').then(r => r.json()),
+      fetch('./labels.json').then(r => r.json())
+    ]).then(([linhasData, talhoesData, perimetroData, indicData, labelsData]) => {
         
         rawData = linhasData;
         populateDropdown(rawData);
@@ -313,13 +301,12 @@
         });
 
         map.on('load', () => {
-            // Adiciona as Fontes
             map.addSource('talhoes', { type: 'geojson', data: talhoesData });
             map.addSource('perimetro', { type: 'geojson', data: perimetroData });
             map.addSource('linhas', { type: 'geojson', data: linhasData });
+            map.addSource('labels', { type: 'geojson', data: labelsData });
             map.addSource('markers', { type: 'geojson', data: { type: 'FeatureCollection', features: markersFeatures } });
 
-            // Camada Talhões
             map.addLayer({
                 id: 'talhoes-fill',
                 type: 'fill',
@@ -327,7 +314,6 @@
                 paint: { 'fill-color': '#d3d3d3', 'fill-opacity': 0.6 }
             });
 
-            // Camada Perímetro
             map.addLayer({
                 id: 'perimetro-line',
                 type: 'line',
@@ -335,7 +321,6 @@
                 paint: { 'line-color': '#000000', 'line-width': 3 }
             });
 
-            // Camada Linhas
             map.addLayer({
                 id: 'linhas-line',
                 type: 'line',
@@ -343,30 +328,18 @@
                 paint: { 'line-color': '#000000', 'line-width': 4 }
             });
 
-            // Marcadores de Início (Verde) e Fim (Vermelho)
-            map.addLayer({
-                id: 'markers-start', type: 'circle', source: 'markers', filter: ['==', 'type', 'start'],
-                paint: { 'circle-radius': 5, 'circle-color': '#22c55e', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff' },
-                minzoom: 14
-            });
-            map.addLayer({
-                id: 'markers-end', type: 'circle', source: 'markers', filter: ['==', 'type', 'end'],
-                paint: { 'circle-radius': 5, 'circle-color': '#ef4444', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff' },
-                minzoom: 14
-            });
-
-            // Rótulos de Metragem: ALINHADOS e DIRECIONADOS com a Linha
+            // NOVA CAMADA DE LABELS USANDO O labels.json
             map.addLayer({
                 id: 'linhas-labels',
                 type: 'symbol',
-                source: 'linhas',
+                source: 'labels',
                 minzoom: 15,
                 layout: {
                     'symbol-placement': 'line',
                     'text-field': ['concat', ['to-string', ['get', 'Dimensao Linha(m)']], ' m'],
                     'text-font': ['Open Sans Regular'], 
                     'text-size': 13,
-                    'text-offset': [0, -0.5], 
+                    'text-offset': [0, -0.5],
                     'text-anchor': 'bottom',
                     'text-keep-upright': true,
                     'text-allow-overlap': true,
@@ -379,9 +352,19 @@
                 }
             });
 
-            applyTheme(); // Aplica a tematização padrão
+            map.addLayer({
+                id: 'markers-start', type: 'circle', source: 'markers', filter: ['==', 'type', 'start'],
+                paint: { 'circle-radius': 5, 'circle-color': '#22c55e', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff' },
+                minzoom: 14
+            });
+            map.addLayer({
+                id: 'markers-end', type: 'circle', source: 'markers', filter: ['==', 'type', 'end'],
+                paint: { 'circle-radius': 5, 'circle-color': '#ef4444', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff' },
+                minzoom: 14
+            });
 
-            // Popup para Talhões e Linhas
+            applyTheme(); 
+
             const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: '300px' });
 
             function bindPopup(layerId, hiddenProps = []) {
@@ -404,7 +387,6 @@
             bindPopup('talhoes-fill', ['CHAVE', 'AREA_CALC', 'ÁREA', 'AREA', 'AREA_HA', 'HECTARES']);
             bindPopup('linhas-line', ['start_point', 'end_point']);
 
-            // Ajusta o enquadramento inicial
             const initialBounds = getBounds(rawData.features);
             if (!initialBounds.isEmpty()) map.fitBounds(initialBounds, { padding: 40 });
 
@@ -495,7 +477,6 @@
         if (map.getLayer('talhoes-fill')) map.setLayoutProperty('talhoes-fill', 'visibility', showTalhoes);
         if (map.getLayer('perimetro-line')) map.setLayoutProperty('perimetro-line', 'visibility', showPerimetro);
         
-        // Controle da Camada de Linhas e seus acessórios
         if (map.getLayer('linhas-line')) map.setLayoutProperty('linhas-line', 'visibility', showLinhas);
         if (map.getLayer('linhas-labels')) map.setLayoutProperty('linhas-labels', 'visibility', showLinhas);
         if (map.getLayer('markers-start')) map.setLayoutProperty('markers-start', 'visibility', showLinhas);
@@ -533,16 +514,27 @@
           map.setFilter('linhas-labels', null);
           map.setFilter('markers-start', ['==', 'type', 'start']);
           map.setFilter('markers-end', ['==', 'type', 'end']);
+          map.setFilter('talhoes-fill', null);
+          map.setFilter('perimetro-line', null);
           resetView();
           return;
       }
       
+      // Filtra as linhas e marcadores com o valor exato selecionado
       const filterVal = ['==', ['to-string', ['get', 'layer']], val];
       map.setFilter('linhas-line', filterVal);
       map.setFilter('linhas-labels', filterVal);
       map.setFilter('markers-start', ['all', ['==', 'type', 'start'], filterVal]);
       map.setFilter('markers-end', ['all', ['==', 'type', 'end'], filterVal]);
 
+      // EXTENSÃO SOLICITADA: Corta os 6 primeiros dígitos e filtra os Talhões e Perímetro no campo 'FAZENDA'
+      const fazendaCode = val.substring(0, 6);
+      const filterFazenda = ['==', ['slice', ['to-string', ['get', 'FAZENDA']], 0, fazendaCode.length], fazendaCode];
+      
+      map.setFilter('talhoes-fill', filterFazenda);
+      map.setFilter('perimetro-line', filterFazenda);
+
+      // Centraliza a tela baseando-se apenas nos itens da fazenda filtrada
       const filteredFeatures = rawData.features.filter(f => String(f.properties.layer) === String(val));
       const bounds = getBounds(filteredFeatures);
       if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 40, maxZoom: 17 });
