@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ferti-clealco-v31'; 
+const CACHE_NAME = 'ferti-clealco-v32'; 
 const TILE_CACHE = 'ferti-tiles-v1';
 
 const ASSETS = [
